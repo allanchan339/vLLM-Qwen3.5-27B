@@ -32,7 +32,7 @@ rm -rf ~/.cache/flashinfer
 source /home/cychan/vllm/.venv/bin/activate
 
 # Start vLLM with reduced swap space
-/home/cychan/vllm/.venv/bin/vllm serve z-lab/Qwen3.5-27B-PARO \
+/home/cychan/vllm/.venv/bin/vllm serve QuantTrio/Qwen3.5-27B-AWQ \
   --served-model-name vllm/Qwen3.5-27B \
   --trust-remote-code \
   --tensor-parallel-size 2 \
@@ -43,10 +43,10 @@ source /home/cychan/vllm/.venv/bin/activate
   --enable-prefix-caching \
   --max-num-batched-tokens 4096 \
   --max-num-seqs 8 \
-  --kv-cache-dtype fp8 \
+    --kv-cache-dtype fp8 \
   --tool-call-parser qwen3_coder \
   --reasoning-parser qwen3 \
-  --attention-backend FLASHINFER \
+    --attention-backend FLASHINFER \
   --no-use-tqdm-on-load \
   --host 0.0.0.0 \
   --port 8000
