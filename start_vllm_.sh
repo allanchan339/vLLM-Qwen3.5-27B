@@ -3,14 +3,18 @@
 # --------------------------
 # CUDA PATH SETTINGS
 # --------------------------
-export CUDA_HOME=/usr/local/cuda-13.0
+# Since nvcc is in /usr/bin, we set CUDA_HOME to /usr
+export CUDA_HOME=/usr
 export PATH=$CUDA_HOME/bin:$PATH
-export LD_LIBRARY_PATH=$CUDA_HOME/lib64:$HOME/.local/lib/python3.12/site-packages/nvidia/nccl/lib:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
 # ------------------------------
 # Safe, Speed-Focused Env Vars
 # ------------------------------
-export CUDA_DEVICE_ORDER=PCI_BUS_ID
-export NCCL_CUMEM_ENABLE=0
+export CUDA_DEVICE_ORDER=PCI_BUS_ID  # Your original mixed-GPU safeguard
+#export CUDA_VISIBLE_DEVICES=0,1        # Explicit device selection
+export NCCL_CUMEM_ENABLE=0             # Fixes WSL2 NCCL issues
+#export VLLM_ENABLE_CUDAGRAPH_GC=1      # Prevents VRAM leaks from CUDA graphs
+#export VLLM_USE_FLASHINFER_SAMPLER=1   # Faster sampling (great for speculative decoding)
 
 export OMP_NUM_THREADS=4
 
@@ -27,26 +31,26 @@ rm -rf ~/.cache/flashinfer
 # Activate virtual environment
 source /home/cychan/vllm/.venv/bin/activate
 
-# Start ParoQuant (vLLM backend) with reduced swap space
-# python -m paroquant.cli.serve --model z-lab/Qwen3.5-27B-PARO --port 8000
-
-python -m paroquant.cli.serve --model z-lab/Qwen3.5-27B-PARO --port 8000 \
+# Start vLLM with reduced swap space
+/home/cychan/vllm/.venv/bin/vllm serve Intel/Qwen3.5-27B-int4-AutoRound \
   --served-model-name vllm/Qwen3.5-27B \
+  --dtype bfloat16 \
   --trust-remote-code \
   --tensor-parallel-size 2 \
-  --max-model-len 32768 \
+  --max-model-len 220000 \
+  --gpu-memory-utilization 0.8 \
   --enable-auto-tool-choice \
   --enable-chunked-prefill \
   --enable-prefix-caching \
+  --max-num-batched-tokens 4096 \
+  --max-num-seqs 8 \
   --kv-cache-dtype fp8 \
   --tool-call-parser qwen3_coder \
   --reasoning-parser qwen3 \
-  --gpu-memory-utilization 0.8 \
-  --max-num-batched-tokens 4096 \
-  --max-num-seqs 8 \
   --no-use-tqdm-on-load \
-  --host 0.0.0.0
+  --host 0.0.0.0 \
+  --port 8000
 #  --speculative-config '{"method":"qwen3_next_mtp","num_speculative_tokens":5}' \
 # current hardware setting is not allowed to have 80BA3B model as speculator
-  # --attention-backend FLASHINFER \ 
-  # --attention-backend FLASH_ATTN \ 
+
+  # --attention-backend FLASHINFER \
