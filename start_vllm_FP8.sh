@@ -48,7 +48,7 @@ vllm serve $MODEL_NAME \
   --max-num-batched-tokens 4096 \
   --max-num-seqs 4 \
   --kv-cache-dtype fp8 \
-  --tool-call-parser qwen3_coder \
+  --tool-call-parser qwen3_xml \
   --reasoning-parser qwen3 \
   --no-use-tqdm-on-load \
   --host 0.0.0.0 \
