@@ -40,7 +40,7 @@ vllm serve $MODEL_NAME \
   --quantization fp8 \
   --trust-remote-code \
   --tensor-parallel-size 2 \
-  --max-model-len 262144 \
+  --max-model-len 219520 \
   --gpu-memory-utilization 0.92 \
   --enable-auto-tool-choice \
   --enable-chunked-prefill \
