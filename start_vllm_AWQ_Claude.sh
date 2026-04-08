@@ -38,7 +38,7 @@ vllm serve $MODEL_NAME \
   --served-model-name vllm/Qwen3.5-27B \
   --attention-backend FLASHINFER \
   --trust-remote-code \
-  --tensor-parallel-size 2 \
+  --pipeline-parallel-size 2 \
   --max-model-len 219520 \
   --gpu-memory-utilization 0.92 \
   --enable-auto-tool-choice \

@@ -30,18 +30,16 @@ rm -rf ~/.cache/flashinfer
 source /home/cychan/vLLM/.venv/bin/activate
 
 export VLLM_TEST_FORCE_FP8_MARLIN=1
-export VLLM_DISABLED_KERNELS="CutlassFp8Kernel"  
 # Enable memory profiler to estimate CUDA graphs v0.19 functionality
 export VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS=1
 export MODEL_NAME="mconcat/Qwopus3.5-27B-v3-FP8-Dynamic"
 # Start vLLM with reduced swap space
 vllm serve $MODEL_NAME \
-  --dtype bfloat16 \
   --served-model-name vllm/Qwen3.5-27B \
   --trust-remote-code \
-  --tensor-parallel-size 2 \
-  --max-model-len 219520 \
-  --gpu-memory-utilization 0.92 \
+  --pipeline-parallel-size 2 \
+  --max-model-len 100000 \
+   --gpu-memory-utilization 0.88 \
   --enable-auto-tool-choice \
   --enable-chunked-prefill \
   --enable-prefix-caching \
@@ -54,7 +52,7 @@ vllm serve $MODEL_NAME \
   --host 0.0.0.0 \
   --port 8000 \
   --language-model-only 
-
+# In PP mode, 112896 is the max context length
 #  --speculative-config '{"method":"qwen3_next_mtp","num_speculative_tokens":5}' \
 # current hardware setting is not allowed to have 80BA3B model as speculator
 
