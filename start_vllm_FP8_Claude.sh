@@ -15,8 +15,6 @@ export CUDA_DEVICE_ORDER=PCI_BUS_ID  # Your original mixed-GPU safeguard
 export NCCL_CUMEM_ENABLE=0             # Fixes WSL2 NCCL issues
 export VLLM_ENABLE_CUDAGRAPH_GC=1      # Prevents VRAM leaks from CUDA graphs
 export VLLM_USE_FLASHINFER_SAMPLER=1   # Faster sampling (great for speculative decoding)
-export VLLM_ATTENTION_BACKEND=FLASHINFER
-
 export OMP_NUM_THREADS=4
 
 # NCCL tuning for SYS/PCIe topology (DO NOT REMOVE)
@@ -32,6 +30,7 @@ rm -rf ~/.cache/flashinfer
 source /home/cychan/vLLM/.venv/bin/activate
 
 export VLLM_TEST_FORCE_FP8_MARLIN=1
+export VLLM_DISABLED_KERNELS="CutlassFp8Kernel"  
 # Enable memory profiler to estimate CUDA graphs v0.19 functionality
 export VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS=1
 export MODEL_NAME="mconcat/Qwopus3.5-27B-v3-FP8-Dynamic"
