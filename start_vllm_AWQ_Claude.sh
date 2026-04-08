@@ -40,7 +40,7 @@ vllm serve $MODEL_NAME \
   --trust-remote-code \
   --pipeline-parallel-size 2 \
   --max-model-len 219520 \
-  --gpu-memory-utilization 0.92 \
+  --gpu-memory-utilization 0.90 \
   --enable-auto-tool-choice \
   --enable-chunked-prefill \
   --enable-prefix-caching \
