@@ -75,8 +75,6 @@ The solution 3 is more complicated, it rely on post-training to fix this issue. 
 
 Another solution is monocat, it is reported to have 17/17 tool calling ability, see https://huggingface.co/Jackrong/Qwen3.5-27B-Claude-4.6-Opus-Reasoning-Distilled for more details. 
 
-
-
 2. Use hermes as tool calling parser instead of qwen3-coder or qwen3-xml. After distillation, the model should align more to teacher model's behavior (which use hermes as tool calling parser).
 
 3. Use AWQ quantization or other INT style quantization instead of FP8 quantization. This will make the model to generate more consistent results in mixed GPU setup. (Both GPU has native support on INT4 or INT8 calculation). Also, it save the VRAM usage for each GPU.
