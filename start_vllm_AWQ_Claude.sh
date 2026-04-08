@@ -14,8 +14,6 @@ export CUDA_DEVICE_ORDER=PCI_BUS_ID  # Your original mixed-GPU safeguard
 #export CUDA_VISIBLE_DEVICES=0,1        # Explicit device selection
 export NCCL_CUMEM_ENABLE=0             # Fixes WSL2 NCCL issues
 export VLLM_ENABLE_CUDAGRAPH_GC=1      # Prevents VRAM leaks from CUDA graphs
-export VLLM_USE_FLASHINFER_SAMPLER=1   # Faster sampling (great for speculative decoding)
-export VLLM_ATTENTION_BACKEND=FLASHINFER
 
 export OMP_NUM_THREADS=4
 
@@ -31,14 +29,14 @@ rm -rf ~/.cache/flashinfer
 # Activate virtual environment
 source /home/cychan/vLLM/.venv/bin/activate
 
-export VLLM_TEST_FORCE_FP8_MARLIN=1
 # Enable memory profiler to estimate CUDA graphs v0.19 functionality
 export VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS=1
-export MODEL_NAME="mconcat/Qwopus3.5-27B-v3-FP8-Dynamic"
+export MODEL_NAME="QuantTrio/Qwopus3.5-27B-v3-AWQ"
+export VLLM_USE_FLASHINFER_SAMPLER=1   # Faster sampling (great for speculative decoding)
 # Start vLLM with reduced swap space
 vllm serve $MODEL_NAME \
-  --dtype bfloat16 \
   --served-model-name vllm/Qwen3.5-27B \
+  --attention-backend FLASHINFER \
   --trust-remote-code \
   --tensor-parallel-size 2 \
   --max-model-len 219520 \
@@ -47,7 +45,7 @@ vllm serve $MODEL_NAME \
   --enable-chunked-prefill \
   --enable-prefix-caching \
   --max-num-batched-tokens 12288 \
-  --max-num-seqs 4 \
+  --max-num-seqs 6 \
   --kv-cache-dtype fp8 \
   --tool-call-parser hermes \
   --reasoning-parser qwen3 \
@@ -56,7 +54,3 @@ vllm serve $MODEL_NAME \
   --port 8000 \
   --language-model-only 
 
-#  --speculative-config '{"method":"qwen3_next_mtp","num_speculative_tokens":5}' \
-# current hardware setting is not allowed to have 80BA3B model as speculator
-
-  # --attention-backend FLASHINFER \
