@@ -29,7 +29,19 @@ This recipe applies to:
 
 **Do not use this recipe if**:
 - Your GPUs are **identical models** (same series, e.g., two 4090s or two 3090s) — use `start_vllm_AWQ_Claude_TP.sh` (TP mode) it's faster and preserves the full 220k context length without the PP overhead
-- You have **total VRAM less than 48GB** — this recipe assumes 48GB (24GB+24GB) for the tight-fit configuration
+- You have **total VRAM less than 48GB** — this recipe requires the full VRAM see VRAM breakdown below]
+
+**VRAM Breakdown **(48GB Total Required)
+
+| Component | Estimated VRAM | Notes |
+|-----------|----------------|-------|
+| **Model Weights **(AWQ) | ~16-18 GB | 27B parameters × 0.5-0.64 bytes + quantization overhead |
+| **KV Cache **(100k context) | ~18-22 GB | 100k tokens × 2 GPUs × FP8/BF16 per token × hidden dim (PP mode doubles allocation) |
+| **CUDA Graphs** | ~2 GB | vLLM CUDA graph caching (v0.19+) |
+| **System + Headroom** | ~2 GB | PyTorch framework + minimal OOM buffer |
+| **Total** | **~38-44 GB** | **Plus overhead → tight-fit to 48GB **(24+24)
+
+**Note:/ Despite the AWQ quantization saving model weight VRAM, the PP mode's KV cache overhead (double the allocation due to sequential processing) leaves almost no slack — this is why context length drops from 220k (TP) to 100k (PP).
 
 **Why this recipe exists**:
 When TP mode splits a 27B model across GPUs with different compute capabilities (SM80 vs SM89), the matrix multiplication kernels (Marlin) produce small precision differences that accumulate via all-reduce operations, causing "garbage in, garbage out" behavior. This recipe uses PP mode + AWQ quantization to avoid mixed-precision errors, accepting the 220k→100k context length tradeoff for stability.
