@@ -18,6 +18,30 @@
 4. Context Length is as long as possible.
 5. Model is stable over long context length.
 
+## Who This Guide Is For
+
+This recipe applies to:
+- **Mixed GPU setups with 48GB VRAM** (e.g., 24GB+24GB, 4090+3090)
+- **Different compute capabilities** (SM80 + SM89 combinations or similar)
+- **WSL2 Ubuntu 22.04** environments on Windows 11
+- Needing **Qwen3.5-27B** (or variants) with stable **tool calling + reasoning**
+- When context length requirements exceed what single-GPU setups can handle
+
+**Do not use this recipe if**:
+- Your GPUs are **identical models** (same series, e.g., two 4090s or two 3090s) — use `start_vllm_AWQ_Claude_TP.sh` (TP mode) it's faster and preserves the full 220k context length without the PP overhead
+- You have **total VRAM less than 48GB** — this recipe assumes 48GB (24GB+24GB) for the tight-fit configuration
+
+**Why this recipe exists**:
+When TP mode splits a 27B model across GPUs with different compute capabilities (SM80 vs SM89), the matrix multiplication kernels (Marlin) produce small precision differences that accumulate via all-reduce operations, causing "garbage in, garbage out" behavior. This recipe uses PP mode + AWQ quantization to avoid mixed-precision errors, accepting the 220k→100k context length tradeoff for stability.
+
+## Model Recommendations for Tool Calling
+
+For production tool agents requiring **stable tool calling with reasoning enabled**, the official Qwen3.5-27B suffers from distillation instabilities (premature tool calls mid-thought). Use these distilled alternatives from the Conclusion:
+
+- **QuantTrio/Qwopus3.5-27B-v3-AWQ** — reported stable with tool calling (NVIDIA forums verification)
+- **Jackrong/Qwen3.5-27B-Claude-4.6-Opus-Reasoning-Distilled** variants with **17/17 tool calling ability**
+**Critical**: Use **Hermes** format as the tool calling parser, not `qwen3-coder` or `qwen3-xml`. After distillation, the model aligns with the teacher's Hermes output format.
+
 # Pain 0: Versioning Issue
 The vllm v0.19.0 is partial support for transformers 5. Due to some bugs, the vLLM is still using transformers 4.49 
 
