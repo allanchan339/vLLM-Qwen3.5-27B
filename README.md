@@ -1,129 +1,247 @@
-# The Pain of using vLLM with Qwen3.5-27B
+# Running Qwen3.5-27B on Mixed GPU Setup: From Pain to Success
 
-## Background  
-### Mixed GPU setup
-- 1x RTX 4090 (SM89) - 24GB VRAM
-- 1x RTX 3090 (SM80) - 24GB VRAM
-- Intel I9-13900K - 32GB RAM
+## Success Story: Knowledge Platform
 
-### Environment
-- windows 11
-- 591.86 nvidia driver
-- wsl2 ubuntu 22.04
+**This configuration now powers a production knowledge graph extraction system** - see [qwen_own_project](https://github.com/allanchan339/qwen_own_project) for the complete working example.
 
-### Goal
-1. Run Qwen3.5-27B in this setup.
-2. Tool calling is stable.
-3. Reasoning is stable.
-4. Context Length is as long as possible.
-5. Model is stable over long context length.
+**Results**: 138.2k tokens over 1h 9m of continuous agentic work with stable tool calling and reasoning.
 
-## Who This Guide Is For
+---
 
-This recipe applies to:
-- **Mixed GPU setups with 48GB VRAM** (e.g., 24GB+24GB, 4090+3090)
-- **Different compute capabilities** (SM80 + SM89 combinations or similar)
-- **WSL2 Ubuntu 22.04** environments on Windows 11
-- Needing **Qwen3.5-27B** (or variants) with stable **tool calling + reasoning**
-- When context length requirements exceed what single-GPU setups can handle
+## Hardware & Environment
 
-**Do not use this recipe if**:
-- Your GPUs are **identical models** (same series, e.g., two 4090s or two 3090s) — use `start_vllm_AWQ_Claude_TP.sh` (TP mode) it's faster and preserves the full 220k context length without the PP overhead
-- You have **total VRAM less than 48GB** — this recipe requires the full VRAM see VRAM breakdown below]
+### Mixed GPU Setup
+- **RTX 4090** (SM89) - 24GB VRAM
+- **RTX 3090** (SM80) - 24GB VRAM
+- Intel i9-13900K - 32GB RAM
+- **Total VRAM**: 48GB
 
-**VRAM Breakdown **(48GB Total Required)
+### Software Stack
+- Windows 11 + WSL2 Ubuntu 22.04
+- NVIDIA Driver: 591.86
+- CUDA: 12.8
+- vLLM: 0.19.0
+- Transformers: 5.5+
 
-| Component | Estimated VRAM | Notes |
-|-----------|----------------|-------|
-| **Model Weights **(AWQ) | ~16-18 GB | 27B parameters × 0.5-0.64 bytes + quantization overhead |
-| **KV Cache **(100k context) | ~18-22 GB | 100k tokens × 2 GPUs × FP8/BF16 per token × hidden dim (PP mode doubles allocation) |
-| **CUDA Graphs** | ~2 GB | vLLM CUDA graph caching (v0.19+) |
-| **System + Headroom** | ~2 GB | PyTorch framework + minimal OOM buffer |
-| **Total** | **~38-44 GB** | **Plus overhead → tight-fit to 48GB **(24+24)
+---
 
-**Note:/ Despite the AWQ quantization saving model weight VRAM, the PP mode's KV cache overhead (double the allocation due to sequential processing) leaves almost no slack — this is why context length drops from 220k (TP) to 100k (PP).
+## Quick Start (Working Configuration)
 
-**Why this recipe exists**:
-When TP mode splits a 27B model across GPUs with different compute capabilities (SM80 vs SM89), the matrix multiplication kernels (Marlin) produce small precision differences that accumulate via all-reduce operations, causing "garbage in, garbage out" behavior. This recipe uses PP mode + AWQ quantization to avoid mixed-precision errors, accepting the 220k→100k context length tradeoff for stability.
+### For FP8 Quantization (Recommended for 48GB VRAM)
 
-## Model Recommendations for Tool Calling
-
-For production tool agents requiring **stable tool calling with reasoning enabled**, the official Qwen3.5-27B suffers from distillation instabilities (premature tool calls mid-thought). Use these distilled alternatives from the Conclusion:
-
-- **QuantTrio/Qwopus3.5-27B-v3-AWQ** — reported stable with tool calling (NVIDIA forums verification)
-- **Jackrong/Qwen3.5-27B-Claude-4.6-Opus-Reasoning-Distilled** variants with **17/17 tool calling ability**
-**Critical**: Use **Hermes** format as the tool calling parser, not `qwen3-coder` or `qwen3-xml`. After distillation, the model aligns with the teacher's Hermes output format.
-
-# Pain 0: Versioning Issue
-The vllm v0.19.0 is partial support for transformers 5. Due to some bugs, the vLLM is still using transformers 4.49 
-
-However, new model e.g. Qwen3.5-27B require new RoPE implementation, making transformers 5.3 or above is a must. 
-
-You have to manually install transformers 5.5 or above, after installed vllm v0.19.0. e.g. 
-```
-uv pip install -U transformers
+```bash
+./start_vllm_FP8.sh
 ```
 
-# Pain 1: Quantization vs Accuracy
-When having 48GB VRAM in total, FP8 quantization is a good choice as the accuracy loss is negligible, comparing to FP16 official model.
+This uses:
+- **Tensor Parallelism (TP=2)** - splits model across both GPUs
+- **FP8 KV Cache** - reduces memory overhead
+- **Custom Jinja template** - stable tool calling with reasoning
+- **FlashInfer backend** - optimized attention kernels
 
-However, this model is >= 27GB in size, it must be run in multi-GPU setup.
+### For AWQ Quantization (Alternative)
 
-## FP8 quantization
-The FP8 quantization is quite stable for this model. However, only the RTX 4090 is supported with native FP8 W8A8 matrix multiplication. For RTX 3090, it will fallback to W8A16 calculation, this difference will accumlate across layers, causing the model to generate incorrect results and non-consistent results. 
+```bash
+./start_vllm_AWQ_Claude_TP.sh
+```
 
-## AWQ quantization
-The AWQ quantization is always having higher plexitiy than FP8 quantization, as FP8 or NVFP4 is not uniform in the range of 0-1. AWQ quantization is uniform in the range of 0-1, making the model to generate more consistent results. The outlier issue is also worse the AWQ quantization.
+See "Quantization Comparison" below for tradeoffs.
 
-Polarquant or paraquant is a better choice. However, it is not officially supported by vLLM, making TP or PP mode is not possible. 
+---
 
-# Pain 2: Mixed GPU Setup
-## TP mode
-TP mode is handy for multi-GPU setup, it is the most popular mode for multi-GPU setup. It will automatically split the model into half (matrix multiplication) for each GPU. It save the VRAM usage for each GPU with a little overhead. 
+## The 5 Problems Solved
 
-Originally this mode is designed for single series of GPU, where the matrix multiplication between two GPUs is the same.
+### Problem 1: Version Compatibility
 
-However, for mixed GPU setup (SM80 + SM89), the matrix multiplication between two GPUs is a problem, as marlin (the matrix multiplication kernel) may provide small difference in the result. Next, two results will be mixed together (all-reduce) to get the final result. The error will accumulate over the context length and layer propagation, causing the model to generate incorrect results. (garbage in, garbage out)
+**Issue**: vLLM 0.19.0 partially supports Transformers 5, but defaults to 4.49. Qwen3.5-27B requires Transformers 5.3+ for new RoPE implementation.
 
-## PP mode
-As said in https://github.com/vllm-project/vllm/issues/34437, for mixed GPU setup, TP mode is not recommended.
+**Solution**:
+```bash
+uv pip install -U transformers  # Upgrade to 5.5+
+```
 
-Therefore, PP mode is the only choice for mixed GPU setup. It will split the model into first half and second half for each GPU. It will not have the matrix multiplication issue. However, it will consume double the VRAM usage on kv cache. It is quite a big overhead as the current vLLM is not optimized for PP mode, making a large context length is consumed (instead of card A keep first half, card B keep second half). 
+---
 
-Eventually it reduce the context length from 220k to 100k to make sure the model can run. 
+### Problem 2: Mixed GPU Precision Drift
 
-# Pain 3: Tool calling (qwen3-coder, qwen3-xml vs Hermes)
+**The Core Issue**: Tensor Parallelism (TP mode) splits matrix multiplication across GPUs. Different compute capabilities (SM80 vs SM89) produce small precision differences in Marlin kernels that accumulate via all-reduce operations.
 
-Tool calling parser is a critical component for tool calling. It will parse the tool call result from the model response. With two common formats: JSON and XML.
+**Why It Matters**:
+- RTX 4090 (SM89): Native FP8 W8A8 support
+- RTX 3090 (SM80): Falls back to W8A16
+- Result: Precision mismatch → error accumulation → "garbage in, garbage out"
 
-The tool calling is not stable for tool calling parser, it will cause the model unable to generate correct tool call result. Especially when offical model tend to call tool calling in the middle of thinking block (without </thinking> tag). It is actually a disiliation error from teacher model, causing the model to generate incorrect tool call result.
+**Initial Workaround (PP Mode)**:
+Pipeline Parallelism avoids mixed-precision by splitting layers sequentially, but doubles KV cache VRAM usage, reducing context from 220k → 100k tokens.
 
-The solution 1 is to use qwen3-xml instead of qwen3-coder to ensure the tool calling is always xml format that avoid failed tool calling as <stop>, causing the model to stop generating result when it is not supposed to. However, this fix is not perfect, as the model may still generate incorrect tool call result.
+**Final Solution (FP8 with NCCL Tuning)**:
+```bash
+export NCCL_P2P_DISABLE=1    # Disable P2P to avoid precision mismatch
+export NCCL_IB_DISABLE=1     # Force PCIe communication
+export NCCL_ALGO=Ring        # Stable ring algorithm
+export VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS=1
+export VLLM_TEST_FORCE_FP8_MARLIN=1
+```
 
-The solution 2 is to replace the chat template to ensure the tool calling is always xml format that avoid failed tool calling as <stop>, causing the model to stop generating result when it is not supposed to. However, this fix is not perfect either, as the model may still generate incorrect tool call result.
+Combined with FP8 KV cache (`--kv-cache-dtype fp8`), this achieves **219k context length** with stable outputs.
 
-## Workaround: Disable Thinking Mode (Official Qwen Only)
-For **official Qwen3.5-27B**, there's one more workaround: **disable reasoning/thinking mode** when calling the API.
+---
 
-- **Effect**: Prevents the model from inserting `<think>` blocks, forcing it to output tool calls directly
-- **Result**: Tool calling becomes stable (no premature `</thinking>` cuts)
-- **Cost**: **Significant reasoning degradation** - The model loses Chain-of-Thought benefits, performing much worse on complex reasoning, math, or multi-step tool orchestration
+### Problem 3: Tool Calling Instability
 
-This workaround acknowledges the root issue: the distillation target had unstable COP (generate tool calls mid-thought without closing). Removing thinking entirely fixes tool calling but sacrifices the reasoning capability entirely.
+**Issue**: Official Qwen3.5-27B has distillation instability - generates tool calls mid-thought without closing `</thinking>` tag, causing premature stops.
 
-# Pain 4: Small model stability over long context length
-The solution 3 is more complicated, it rely on post-training to fix this issue. Luckily, we can find huggingface model that is distilled on Claude 4.6 Opus Reasoning model, by learning teacher model's CoT and reasoning result. Model can be more stable over long context length, reasoning, and tool calling. Model can be found in https://huggingface.co/Jackrong/Qwopus3.5-27B-v3
+**Solution**: Custom Jinja template (`qwen3.5-enhanced.jinja`) with:
+- M2.5-style interleaved thinking (hides historical reasoning, keeps current)
+- XML tool call format that avoids `<stop>` token issues
+- Proper `</thinking>` tag handling
 
-# Conclusion
-1. Choose distilled model Qwopus3.5-27B-v3 instead of official model Qwen3.5-27B. This model is more stable over long context length, reasoning, and tool calling.
-1.1 Given the AWQ quantization is not lossless, we need to pick a model that is as less plexitiy as possible. Some user reported QuantTrio/Qwopus3.5-27B-v3-AWQ is stable with tool calling ability. See https://forums.developer.nvidia.com/t/success-with-quanttrio-qwen3-5-27b-claude-4-6-opus-reasoning-distilled-v2-awq/365416.
+**Alternative**: Use distilled models like `QuantTrio/Qwopus3.5-27B-v3-AWQ` or `Jackrong/Qwen3.5-27B-Claude-4.6-Opus-Reasoning-Distilled` with Hermes parser.
 
-Another solution is monocat, it is reported to have 17/17 tool calling ability, see https://huggingface.co/Jackrong/Qwen3.5-27B-Claude-4.6-Opus-Reasoning-Distilled for more details. 
+---
 
-2. Use hermes as tool calling parser instead of qwen3-coder or qwen3-xml. After distillation, the model should align more to teacher model's behavior (which use hermes as tool calling parser).
+### Problem 4: Quantization Tradeoffs
 
-3. Use AWQ quantization or other INT style quantization instead of FP8 quantization. This will make the model to generate more consistent results in mixed GPU setup. (Both GPU has native support on INT4 or INT8 calculation). Also, it save the VRAM usage for each GPU.
+**FP8 Quantization**:
+- **Pros**: Minimal accuracy loss vs FP16, native support on RTX 4090
+- **Cons**: RTX 3090 falls back to W8A16, potential precision drift
+- **Best for**: 48GB VRAM setups needing maximum context length
 
-4. Use PP mode instead of TP mode in mixed GPU setup. This is to ensure the model accuracy is not affected by the matrix multiplication issue.
+**AWQ Quantization**:
+- **Pros**: Uniform 0-1 range, consistent across different GPU architectures
+- **Cons**: Higher precision requirements, slightly more VRAM usage
+- **Best for**: Mixed GPU setups prioritizing stability over context length
 
-5. Use vllm v0.19.0 with transformers v5.5 or above.
+**Recommendation**: Start with FP8 (this repo's default). If you encounter instability, switch to AWQ.
+
+---
+
+### Problem 5: Context Length vs VRAM
+
+**VRAM Breakdown (48GB Total)**:
+
+| Component | FP8 (TP Mode) | AWQ (PP Mode) |
+|-----------|---------------|---------------|
+| Model Weights | ~16-18 GB | ~16-18 GB |
+| KV Cache (219k context) | ~18-20 GB | N/A |
+| KV Cache (100k context) | N/A | ~18-22 GB |
+| CUDA Graphs | ~2 GB | ~2 GB |
+| System + Headroom | ~2 GB | ~2 GB |
+| **Total** | **~38-42 GB** | **~38-44 GB** |
+
+**Key Insight**: TP mode with FP8 KV cache achieves 219k context. PP mode with AWQ is limited to ~100k due to doubled KV cache allocation.
+
+---
+
+## Complete Working Configuration
+
+### Environment Variables
+
+```bash
+# CUDA PATH SETTINGS
+export CUDA_HOME=/usr
+export PATH=$CUDA_HOME/bin:$PATH
+export LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
+
+# Safe, Speed-Focused Env Vars
+export CUDA_DEVICE_ORDER=PCI_BUS_ID
+export CUDA_VISIBLE_DEVICES=0,1
+export NCCL_CUMEM_ENABLE=0
+export VLLM_ENABLE_CUDAGRAPH_GC=1
+export VLLM_USE_FLASHINFER_SAMPLER=1
+export OMP_NUM_THREADS=4
+
+# NCCL tuning for mixed GPU topology
+export NCCL_P2P_DISABLE=1
+export NCCL_IB_DISABLE=1
+export NCCL_ALGO=Ring
+
+# FP8 configuration
+export VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS=1
+export VLLM_TEST_FORCE_FP8_MARLIN=1
+```
+
+### vLLM Serve Command
+
+```bash
+vllm serve Qwen/Qwen3.5-27B-FP8 \
+  --served-model-name vllm/Qwen3.5-27B \
+  --chat-template qwen3.5-enhanced.jinja \
+  --attention-backend FLASHINFER \
+  --trust-remote-code \
+  --tensor-parallel-size 2 \
+  --max-model-len 219520 \
+  --gpu-memory-utilization 0.92 \
+  --enable-auto-tool-choice \
+  --enable-chunked-prefill \
+  --enable-prefix-caching \
+  --max-num-batched-tokens 4096 \
+  --max-num-seqs 4 \
+  --kv-cache-dtype fp8 \
+  --tool-call-parser qwen3_xml \
+  --reasoning-parser qwen3 \
+  --no-use-tqdm-on-load \
+  --host 0.0.0.0 \
+  --port 8000 \
+  --language-model-only
+```
+
+---
+
+## Verification
+
+Test the setup with:
+
+```bash
+# Test basic generation
+curl http://localhost:8000/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "vllm/Qwen3.5-27B",
+    "messages": [{"role": "user", "content": "Hello"}],
+    "max_tokens": 100
+  }'
+
+# Test tool calling
+curl http://localhost:8000/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "vllm/Qwen3.5-27B",
+    "messages": [{"role": "user", "content": "What is the weather in Tokyo?"}],
+    "tools": [{"type": "function", "function": {"name": "get_weather", "parameters": {"type": "object", "properties": {"city": {"type": "string"}}, "required": ["city"]}}}]
+  }'
+```
+
+---
+
+## Troubleshooting
+
+### Issue: "Out of Memory" errors
+- Reduce `--gpu-memory-utilization` to 0.85
+- Reduce `--max-model-len` to 131072
+- Reduce `--max-num-seqs` to 2
+
+### Issue: Unstable tool calling
+- Verify `qwen3.5-enhanced.jinja` is in the working directory
+- Check `--tool-call-parser qwen3_xml` is set
+- Consider switching to distilled model with Hermes parser
+
+### Issue: Precision drift in long conversations
+- Verify all NCCL environment variables are set
+- Try `export NCCL_NVLS_DISABLE=1`
+- Consider switching to AWQ quantization
+
+---
+
+## References
+
+- [vLLM Issue #34437](https://github.com/vllm-project/vllm/issues/34437) - Mixed GPU TP mode instability
+- [Reddit Discussion](https://www.reddit.com/r/LocalLLaMA/comments/1sdhvc5/qwen_35_tool_calling_fixes_for_agentic_use_whats/) - Tool calling fixes
+- [Qwen3 Issue #1831](https://github.com/QwenLM/Qwen3/issues/1831) - Official model issues
+- [NVIDIA Forums](https://forums.developer.nvidia.com/t/success-with-quanttrio-qwen3-5-27b-claude-4-6-opus-reasoning-distilled-v2-awq/365416) - AWQ success reports
+
+---
+
+## License
+
+MIT

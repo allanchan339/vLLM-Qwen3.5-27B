@@ -1,7 +1,15 @@
 #!/bin/bash
-# TP mode - pending stability testing (tool calling may have issues with </thinking> tag)
-# This is some disiliation from the original model issue. 397B or 122B has no such problem.
-# Requires custom jinja template: @qwen3.5-enhanced.jinja (renamed from deckard) 
+# SUCCESS: Proven stable configuration for Qwen3.5-27B on mixed GPU setup
+# 
+# Verified: 138.2k tokens over 1h 9m continuous agentic work
+# Project: https://github.com/allanchan339/qwen_own_project (Knowledge Platform)
+#
+# Key fixes:
+# - NCCL tuning for mixed GPU (RTX 3090 SM80 + RTX 4090 SM89)
+# - Custom Jinja template for stable tool calling with reasoning
+# - FP8 KV cache for 219k context length
+#
+# Requires: qwen3.5-enhanced.jinja template in working directory 
 
 # --------------------------
 # CUDA PATH SETTINGS
