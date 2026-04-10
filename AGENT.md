@@ -4,7 +4,36 @@
 
 ---
 
-## Critical Setup Requirements
+## ⚠️ ROOT CAUSE: Jinja Template (MUST FIX FIRST)
+
+**Without this fix, ALL other optimizations are useless.**
+
+### The Critical Issue
+
+Qwen3.5-27B is unstable with the official template (`qwen3.5_official.jinja`) due to:
+- Tool calls generated mid-thought without closing `</thinking>` tags
+- Edge cases that 122B+ models handle gracefully but 27B fails on
+- Distillation artifacts causing premature `<stop>` tokens
+
+**vLLM does NOT auto-detect templates. You MUST manually specify:**
+
+```bash
+--chat-template qwen3.5-enhanced.jinja
+```
+
+### Why the Custom Template Works
+
+`qwen3.5-enhanced.jinja` implements M2.5-style interleaved thinking:
+- ✅ Proper `</thinking>` tag handling before tool calls
+- ✅ Historical reasoning hidden, current reasoning preserved
+- ✅ XML format that avoids `<stop>` token issues
+- ✅ Robust edge case handling for smaller models (27B)
+
+**Without this flag, the model will fail regardless of NCCL tuning, quantization, or GPU setup.**
+
+---
+
+## Other Critical Requirements
 
 ### 1. Version Compatibility
 - **vLLM 0.19.0 requires transformers 5.5** (not 4.49) for Qwen3.5-27B RoPE
@@ -16,22 +45,20 @@
 
 ---
 
-### 2. GPU Parallelism: TP vs PP (UPDATED)
+### 2. GPU Parallelism: TP Mode Works (with Jinja template)
 
-**NEW: TP Mode NOW WORKS with proper NCCL tuning**
+**TP Mode is RECOMMENDED** when using the correct Jinja template:
 
-#### Option A: Tensor Parallelism (TP) - **RECOMMENDED**
 ```bash
 --tensor-parallel-size 2
 --kv-cache-dtype fp8
 ```
 
-**Requirements**:
+**Optional NCCL Tuning** (provides additional stability margin):
 ```bash
-export NCCL_P2P_DISABLE=1    # Critical for mixed GPU
+export NCCL_P2P_DISABLE=1    # Recommended for mixed GPU
 export NCCL_IB_DISABLE=1     # Force PCIe
 export NCCL_ALGO=Ring        # Stable algorithm
-export VLLM_TEST_FORCE_FP8_MARLIN=1
 ```
 
 **Benefits**:
@@ -40,21 +67,7 @@ export VLLM_TEST_FORCE_FP8_MARLIN=1
 - ✅ Faster inference
 - ✅ Proven stable (Knowledge Platform)
 
-#### Option B: Pipeline Parallelism (PP) - **LEGACY**
-```bash
---pipeline-parallel-size 2
-```
-
-**When to use**:
-- If TP mode still shows instability after NCCL tuning
-- Requires AWQ quantization for best results
-- Limited to ~100k context (double KV cache overhead)
-
-**Why TP Works Now**:
-The precision drift issue (SM80 vs SM89) is mitigated by:
-1. Disabling P2P communication (`NCCL_P2P_DISABLE=1`)
-2. Using FP8 KV cache (`--kv-cache-dtype fp8`)
-3. Ring algorithm for stable all-reduce (`NCCL_ALGO=Ring`)
+**Note**: The Jinja template is the PRIMARY fix. NCCL tuning is secondary optimization.
 
 ---
 

@@ -62,7 +62,48 @@ See "Quantization Comparison" below for tradeoffs.
 
 ---
 
-## The 5 Problems Solved
+## Root Cause: Jinja Template Instability (CRITICAL)
+
+**This is the PRIMARY issue that must be fixed first.**
+
+### The Problem
+
+The official `qwen3.5_official.jinja` template has edge cases that cause instability in Qwen3.5-27B but NOT in larger models (122B+):
+
+1. **Tool calling mid-thought**: Model generates `
+</think>` tags without properly closing `<think>` blocks
+2. **Premature stops**: XML tool calls trigger `<stop>` tokens incorrectly
+3. **Reasoning leakage**: Historical thinking blocks not properly hidden from context
+
+**Why 27B vs 122B+?**
+- Smaller models have less robust instruction following
+- Edge cases in template logic that larger models handle gracefully
+- Distillation artifacts from training data
+
+### The Solution: Custom Template
+
+Use `qwen3.5-enhanced.jinja` which implements M2.5-style interleaved thinking:
+
+```bash
+--chat-template qwen3.5-enhanced.jinja
+```
+
+**Key improvements**:
+- Proper `</thinking>` tag handling before tool calls
+- Historical reasoning hidden, current reasoning preserved
+- XML format that avoids `<stop>` token issues
+- Robust edge case handling for smaller models
+
+**CRITICAL**: vLLM does NOT auto-detect templates. You MUST manually specify:
+```bash
+vllm serve ... --chat-template qwen3.5-enhanced.jinja ...
+```
+
+Without this flag, the model will use the default template and exhibit instability regardless of other optimizations.
+
+---
+
+## Other Problems Solved
 
 ### Problem 1: Version Compatibility
 
@@ -75,45 +116,29 @@ uv pip install -U transformers  # Upgrade to 5.5+
 
 ---
 
-### Problem 2: Mixed GPU Precision Drift
+### Problem 2: Mixed GPU Precision Drift (Secondary Issue)
 
-**The Core Issue**: Tensor Parallelism (TP mode) splits matrix multiplication across GPUs. Different compute capabilities (SM80 vs SM89) produce small precision differences in Marlin kernels that accumulate via all-reduce operations.
+**Note**: This was initially suspected as the root cause, but the Jinja template is PRIMARY. NCCL tuning is still recommended for optimal stability.
+
+**The Issue**: Tensor Parallelism (TP mode) splits matrix multiplication across GPUs. Different compute capabilities (SM80 vs SM89) can produce small precision differences.
 
 **Why It Matters**:
 - RTX 4090 (SM89): Native FP8 W8A8 support
 - RTX 3090 (SM80): Falls back to W8A16
-- Result: Precision mismatch → error accumulation → "garbage in, garbage out"
+- Potential: Precision mismatch → error accumulation
 
-**Initial Workaround (PP Mode)**:
-Pipeline Parallelism avoids mixed-precision by splitting layers sequentially, but doubles KV cache VRAM usage, reducing context from 220k → 100k tokens.
-
-**Final Solution (FP8 with NCCL Tuning)**:
+**Mitigation (NCCL Tuning)**:
 ```bash
-export NCCL_P2P_DISABLE=1    # Disable P2P to avoid precision mismatch
-export NCCL_IB_DISABLE=1     # Force PCIe communication
-export NCCL_ALGO=Ring        # Stable ring algorithm
-export VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS=1
-export VLLM_TEST_FORCE_FP8_MARLIN=1
+export NCCL_P2P_DISABLE=1    # Disable P2P communication
+export NCCL_IB_DISABLE=1     # Force PCIe
+export NCCL_ALGO=Ring        # Stable algorithm
 ```
 
-Combined with FP8 KV cache (`--kv-cache-dtype fp8`), this achieves **219k context length** with stable outputs.
+**Important**: With the correct Jinja template, TP mode works reliably even on mixed GPUs. NCCL tuning provides additional stability margin.
 
 ---
 
-### Problem 3: Tool Calling Instability
-
-**Issue**: Official Qwen3.5-27B has distillation instability - generates tool calls mid-thought without closing `</thinking>` tag, causing premature stops.
-
-**Solution**: Custom Jinja template (`qwen3.5-enhanced.jinja`) with:
-- M2.5-style interleaved thinking (hides historical reasoning, keeps current)
-- XML tool call format that avoids `<stop>` token issues
-- Proper `</thinking>` tag handling
-
-**Alternative**: Use distilled models like `QuantTrio/Qwopus3.5-27B-v3-AWQ` or `Jackrong/Qwen3.5-27B-Claude-4.6-Opus-Reasoning-Distilled` with Hermes parser.
-
----
-
-### Problem 4: Quantization Tradeoffs
+### Problem 3: Quantization Tradeoffs
 
 **FP8 Quantization**:
 - **Pros**: Minimal accuracy loss vs FP16, native support on RTX 4090
@@ -129,7 +154,7 @@ Combined with FP8 KV cache (`--kv-cache-dtype fp8`), this achieves **219k contex
 
 ---
 
-### Problem 5: Context Length vs VRAM
+### Problem 4: Context Length vs VRAM
 
 **VRAM Breakdown (48GB Total)**:
 
