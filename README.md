@@ -70,8 +70,7 @@ See "Quantization Comparison" below for tradeoffs.
 
 The official `qwen3.5_official.jinja` template has edge cases that cause instability in Qwen3.5-27B but NOT in larger models (122B+):
 
-1. **Tool calling mid-thought**: Model generates `
-</think>` tags without properly closing `<think>` blocks
+1. **Tool calling mid-thought**: Model generates `</think>` tags without properly closing `<think>` blocks
 2. **Premature stops**: XML tool calls trigger `<stop>` tokens incorrectly
 3. **Reasoning leakage**: Historical thinking blocks not properly hidden from context
 
@@ -159,7 +158,17 @@ export NCCL_ALGO=Ring        # Stable algorithm
 - **Cons**: Higher precision requirements, slightly more VRAM usage
 - **Best for**: Mixed GPU setups prioritizing stability over context length
 
-**Recommendation**: Start with FP8 (this repo's default). If you encounter instability, switch to AWQ.
+**⚠️ WARNING: Qwopus3.5 Series is a TRAP for Long Context**
+
+Models like `QuantTrio/Qwopus3.5-27B-v3-AWQ` are SFT-distilled from Claude 4.6 Opus, which:
+- **Shifted tool calling format**: From `qwen3_xml` → `hermes` (JSON-based)
+- **Appears stable initially**: Works fine for first ~65K tokens
+- **Fails in long context**: After 65K+ tokens, output **mixes XML and JSON formats**
+- **Root cause**: SFT doesn't maintain format consistency as well as base model fine-tuning
+
+**Why this happens**: SFT (Supervised Fine-Tuning) changes the model's output distribution to match Claude's Hermes format, but doesn't fully align the underlying token probabilities. In long contexts (>65K tokens), the model drifts between its original Qwen XML format and the SFT'd JSON format.
+
+**Recommendation**: For long-context agentic work (>65K tokens), use official `Qwen/Qwen3.5-27B-FP8` with custom Jinja template instead of SFT-distilled variants.
 
 ---
 
@@ -271,12 +280,12 @@ curl http://localhost:8000/v1/chat/completions \
 ### Issue: Unstable tool calling
 - Verify `qwen3.5-enhanced.jinja` is in the working directory
 - Check `--tool-call-parser qwen3_xml` is set
-- Consider switching to distilled model with Hermes parser
+- **Do not use Qwopus3.5 series** for long-context work (format drift after 65K tokens)
 
 ### Issue: Precision drift in long conversations
 - Verify all NCCL environment variables are set
+- Check `VLLM_TEST_FORCE_FP8_MARLIN=1` is set
 - Try `export NCCL_NVLS_DISABLE=1`
-- Consider switching to AWQ quantization
 
 ---
 
@@ -285,7 +294,7 @@ curl http://localhost:8000/v1/chat/completions \
 - [vLLM Issue #34437](https://github.com/vllm-project/vllm/issues/34437) - Mixed GPU TP mode instability
 - [Reddit Discussion](https://www.reddit.com/r/LocalLLaMA/comments/1sdhvc5/qwen_35_tool_calling_fixes_for_agentic_use_whats/) - Tool calling fixes
 - [Qwen3 Issue #1831](https://github.com/QwenLM/Qwen3/issues/1831) - Official model issues
-- [NVIDIA Forums](https://forums.developer.nvidia.com/t/success-with-quanttrio-qwen3-5-27b-claude-4-6-opus-reasoning-distilled-v2-awq/365416) - AWQ success reports
+- [NVIDIA Forums](https://forums.developer.nvidia.com/t/success-with-quanttrio-qwen3-5-27b-claude-4-6-opus-reasoning-distilled-v2-awq/365416) - AWQ success reports (note: long-context issues not discussed)
 
 ---
 

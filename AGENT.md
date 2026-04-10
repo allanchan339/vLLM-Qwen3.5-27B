@@ -90,12 +90,16 @@ export NCCL_ALGO=Ring        # Stable algorithm
 - Custom Jinja template for stable tool calling
 - Proven stable in production
 
-#### For Maximum Stability
-**Alternative**: `QuantTrio/Qwopus3.5-27B-v3-AWQ`
-- AWQ (INT4) uniform quantization
-- Distilled from Claude 4.6 Opus
-- Better tool calling out-of-the-box
-- Use with Hermes parser
+#### ⚠️ AVOID for Long Context: Qwopus3.5 Series
+**Trap**: `QuantTrio/Qwopus3.5-27B-v3-AWQ` and similar SFT-distilled models
+
+**Why it's a trap**:
+- SFT from Claude 4.6 Opus shifted tool calling from `qwen3_xml` → `hermes` (JSON)
+- **Appears stable**: Works fine for first ~65K tokens
+- **Fails in long context**: After 65K+ tokens, output **mixes XML and JSON formats**
+- **Root cause**: SFT doesn't maintain format consistency as well as base model fine-tuning
+
+**Recommendation**: For long-context agentic work (>65K tokens), use official `Qwen/Qwen3.5-27B-FP8` with custom Jinja template.
 
 ---
 
@@ -113,16 +117,20 @@ export NCCL_ALGO=Ring        # Stable algorithm
 - XML format avoids `<stop>` token issues
 - M2.5-style interleaved thinking prevents premature stops
 
-#### Distilled Models (Qwopus series)
+#### Distilled Models (Qwopus series) - NOT RECOMMENDED for Long Context
 ```bash
 --tool-call-parser hermes
 --chat-template qwen3.5-barubary-attuned-chat-template_hermes.jinja
 ```
 
-**Benefits**:
-- Trained on Claude's Hermes format
-- 17/17 tool calling accuracy reported
-- No distillation artifacts
+**⚠️ Warning**: Only use for short contexts (<65K tokens)
+
+**Why**:
+- SFT from Claude shifted format from XML → JSON
+- After 65K+ tokens: Output mixes XML and JSON (unstable)
+- 17/17 tool calling accuracy only holds for short sessions
+
+**For long-context work**: Use official Qwen3.5-27B-FP8 with custom Jinja template instead.
 
 ---
 
