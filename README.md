@@ -265,6 +265,8 @@ vllm serve Qwen/Qwen3.5-27B-FP8 \
 
 ## Verification
 
+### Quick Test (curl)
+
 Test the setup with:
 
 ```bash
@@ -286,6 +288,32 @@ curl http://localhost:8000/v1/chat/completions \
     "tools": [{"type": "function", "function": {"name": "get_weather", "parameters": {"type": "object", "properties": {"city": {"type": "string"}}, "required": ["city"]}}}]
   }'
 ```
+
+### Performance Benchmark
+
+For comprehensive benchmarking (throughput, latency, RPS):
+
+```bash
+./bench_vllm.sh
+```
+
+This runs vLLM's built-in benchmark with:
+- **50 concurrent prompts**
+- **2048 input tokens** each
+- **512 output tokens** each
+- **Random dataset** generation
+
+**Output includes**:
+- Total throughput (tokens/sec)
+- Requests per second (RPS)
+- Latency percentiles (TTFT, TPOT, P50, P95, P99)
+- GPU utilization metrics
+
+**Customize benchmark**:
+Edit `bench_vllm.sh` to change:
+- `INPUT_LEN` - Input token length (default: 2048)
+- `OUTPUT_LEN` - Output token length (default: 512)
+- `NUM_PROMPTS` - Number of prompts (default: 50)
 
 ---
 

@@ -40,6 +40,13 @@ This folder contains scripts and templates that are no longer recommended for us
 
 **Use instead**: `../start_vllm_FP8.sh` or `../start_vllm_autoround.sh`
 
+### Test Scripts (Not User-Friendly)
+- `test_vllm.py` - Developer testing script, hardcoded tests
+- `final_bench.py` - Developer benchmarking script, requires manual configuration
+
+**Why deprecated**: These are development/testing utilities, not user-friendly tools
+- **Use instead**: See `README.md` "Verification" section for curl-based testing commands
+
 ## Recommended Setup
 
 ### For 48GB VRAM (Best Quality)

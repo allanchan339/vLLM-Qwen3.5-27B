@@ -10,7 +10,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/.venv/bin/activate"
 
 # Configuration
-MODEL_NAME="QuantTrio/Qwopus3.5-27B-v3-AWQ"
+MODEL_NAME="Qwen/Qwen3.5-27B-FP8"
 SERVED_MODEL_NAME="vllm/Qwen3.5-27B"
 BASE_URL="http://localhost:8000"
 ENDPOINT="/v1/chat/completions"
