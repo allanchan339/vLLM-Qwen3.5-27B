@@ -1,38 +1,37 @@
 #!/bin/bash
-# THIS IS THE ONLY CONFIG THAT IS WORKING FOR NOW.
+# ⚠️ DEPRECATED: Uses Qwopus3.5 series (SFT-distilled)
+#
+# WARNING: This model has format drift issues after 65K tokens
+# See README.md "Qwopus3.5 Series is a TRAP for Long Context"
+#
+# For production use: ./start_vllm_FP8.sh (official Qwen3.5-27B-FP8)
 # --------------------------
 # CUDA PATH SETTINGS
 # --------------------------
-# Since nvcc is in /usr/bin, we set CUDA_HOME to /usr
 export CUDA_HOME=/usr
 export PATH=$CUDA_HOME/bin:$PATH
 export LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
-# ------------------------------
-# Safe, Speed-Focused Env Vars
-# ------------------------------
-export CUDA_DEVICE_ORDER=PCI_BUS_ID  # Your original mixed-GPU safeguard
-#export CUDA_VISIBLE_DEVICES=0,1        # Explicit device selection
-export NCCL_CUMEM_ENABLE=0             # Fixes WSL2 NCCL issues
-export VLLM_ENABLE_CUDAGRAPH_GC=1      # Prevents VRAM leaks from CUDA graphs
 
+# Environment Variables
+export CUDA_DEVICE_ORDER=PCI_BUS_ID
+export NCCL_CUMEM_ENABLE=0
+export VLLM_ENABLE_CUDAGRAPH_GC=1
 export OMP_NUM_THREADS=4
 
-# NCCL tuning for SYS/PCIe topology (DO NOT REMOVE)
+# NCCL tuning for mixed GPU
 export NCCL_P2P_DISABLE=1
 export NCCL_IB_DISABLE=1
 export NCCL_ALGO=Ring
-# --------------------------
-# FIX: Clean Stale FlashInfer Cache
-# --------------------------
+
+# Clean cache
 rm -rf ~/.cache/flashinfer
 
 # Activate virtual environment
 source /home/cychan/vLLM/.venv/bin/activate
 
-# Enable memory profiler to estimate CUDA graphs v0.19 functionality
 export VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS=1
 export MODEL_NAME="QuantTrio/Qwopus3.5-27B-v3-AWQ"
-export VLLM_USE_FLASHINFER_SAMPLER=1   # Faster sampling (great for speculative decoding)
+export VLLM_USE_FLASHINFER_SAMPLER=1
 # Start vLLM with reduced swap space
 vllm serve $MODEL_NAME \
   --served-model-name vllm/Qwen3.5-27B \
