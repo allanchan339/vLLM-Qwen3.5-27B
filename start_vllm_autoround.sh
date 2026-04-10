@@ -1,4 +1,6 @@
 #!/bin/bash
+# This model will die in tool calling as it will call the tool without </thinking> tag.
+# This is some disiliation from the original model issue. 397B or 122B has no such problem. 
 
 # --------------------------
 # CUDA PATH SETTINGS
@@ -13,14 +15,16 @@ export LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
 export CUDA_DEVICE_ORDER=PCI_BUS_ID  # Your original mixed-GPU safeguard
 #export CUDA_VISIBLE_DEVICES=0,1        # Explicit device selection
 export NCCL_CUMEM_ENABLE=0             # Fixes WSL2 NCCL issues
-export VLLM_ENABLE_CUDAGRAPH_GC=1      # Prevents VRAM leaks from CUDA graphs
-export VLLM_USE_FLASHINFER_SAMPLER=1   # Faster sampling (great for speculative decoding)
+#export VLLM_ENABLE_CUDAGRAPH_GC=1      # Prevents VRAM leaks from CUDA graphs
+#export VLLM_USE_FLASHINFER_SAMPLER=1   # Faster sampling (great for speculative decoding)
+
 export OMP_NUM_THREADS=4
 
 # NCCL tuning for SYS/PCIe topology (DO NOT REMOVE)
 export NCCL_P2P_DISABLE=1
 export NCCL_IB_DISABLE=1
 export NCCL_ALGO=Ring
+export MODEL_NAME="Intel/Qwen3.5-27B-int4-AutoRound"
 # --------------------------
 # FIX: Clean Stale FlashInfer Cache
 # --------------------------
@@ -29,30 +33,30 @@ rm -rf ~/.cache/flashinfer
 # Activate virtual environment
 source /home/cychan/vLLM/.venv/bin/activate
 
-export VLLM_TEST_FORCE_FP8_MARLIN=1
 # Enable memory profiler to estimate CUDA graphs v0.19 functionality
 export VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS=1
-export MODEL_NAME="mconcat/Qwopus3.5-27B-v3-FP8-Dynamic"
+export VLLM_TEST_FORCE_FP8_MARLIN=1
 # Start vLLM with reduced swap space
 vllm serve $MODEL_NAME \
   --served-model-name vllm/Qwen3.5-27B \
+  --dtype bfloat16 \
   --trust-remote-code \
-  --pipeline-parallel-size 2 \
-  --max-model-len 100000 \
-   --gpu-memory-utilization 0.88 \
+  --tensor-parallel-size 2 \
+  --max-model-len 219520 \
+  --gpu-memory-utilization 0.92 \
   --enable-auto-tool-choice \
   --enable-chunked-prefill \
   --enable-prefix-caching \
-  --max-num-batched-tokens 12288 \
+  --max-num-batched-tokens 4096 \
   --max-num-seqs 4 \
   --kv-cache-dtype fp8 \
-  --tool-call-parser hermes \
+  --tool-call-parser qwen3_coder \
   --reasoning-parser qwen3 \
   --no-use-tqdm-on-load \
   --host 0.0.0.0 \
   --port 8000 \
   --language-model-only 
-# In PP mode, 112896 is the max context length
+
 #  --speculative-config '{"method":"qwen3_next_mtp","num_speculative_tokens":5}' \
 # current hardware setting is not allowed to have 80BA3B model as speculator
 
