@@ -54,9 +54,20 @@ Qwen3.5-27B is unstable with the official template (`qwen3.5_official.jinja`) du
 --kv-cache-dtype fp8
 ```
 
-**Optional NCCL Tuning** (provides additional stability margin):
+**CRITICAL: Force Consistent FP8 Behavior**
 ```bash
-export NCCL_P2P_DISABLE=1    # Recommended for mixed GPU
+export VLLM_TEST_FORCE_FP8_MARLIN=1  # Force 4090 to use W8A16 (match 3090)
+```
+
+**Why this is critical**:
+- RTX 4090 (SM89): Has native FP8 W8A8 tensor cores
+- RTX 3090 (SM80): No native FP8, uses W8A16
+- **Without this flag**: Precision mismatch → error accumulation
+- **With this flag**: Both GPUs use Marlin W8A16 → consistent results
+
+**Additional NCCL Tuning** (provides stability margin):
+```bash
+export NCCL_P2P_DISABLE=1    # Disable P2P communication
 export NCCL_IB_DISABLE=1     # Force PCIe
 export NCCL_ALGO=Ring        # Stable algorithm
 ```
@@ -67,7 +78,7 @@ export NCCL_ALGO=Ring        # Stable algorithm
 - ✅ Faster inference
 - ✅ Proven stable (Knowledge Platform)
 
-**Note**: The Jinja template is the PRIMARY fix. NCCL tuning is secondary optimization.
+**Note**: The Jinja template is PRIMARY. `VLLM_TEST_FORCE_FP8_MARLIN=1` is SECONDARY but critical for mixed GPU. NCCL tuning is optional optimization.
 
 ---
 
@@ -153,6 +164,8 @@ export NCCL_CUMEM_ENABLE=0
 export VLLM_ENABLE_CUDAGRAPH_GC=1
 export VLLM_USE_FLASHINFER_SAMPLER=1
 export VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS=1
+
+# CRITICAL for mixed GPU: Force 4090 to use W8A16 (match 3090)
 export VLLM_TEST_FORCE_FP8_MARLIN=1
 
 # Thread control

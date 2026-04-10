@@ -118,23 +118,32 @@ uv pip install -U transformers  # Upgrade to 5.5+
 
 ### Problem 2: Mixed GPU Precision Drift (Secondary Issue)
 
-**Note**: This was initially suspected as the root cause, but the Jinja template is PRIMARY. NCCL tuning is still recommended for optimal stability.
+**Note**: This was initially suspected as the root cause, but the Jinja template is PRIMARY. NCCL tuning + FP8 Marlin force is still recommended for optimal stability.
 
-**The Issue**: Tensor Parallelism (TP mode) splits matrix multiplication across GPUs. Different compute capabilities (SM80 vs SM89) can produce small precision differences.
+**The Issue**: Tensor Parallelism (TP mode) splits matrix multiplication across GPUs. Different compute capabilities (SM80 vs SM89) use different FP8 implementations.
 
 **Why It Matters**:
-- RTX 4090 (SM89): Native FP8 W8A8 support
-- RTX 3090 (SM80): Falls back to W8A16
-- Potential: Precision mismatch → error accumulation
+- RTX 4090 (SM89): Native FP8 W8A8 tensor cores
+- RTX 3090 (SM80): No native FP8, falls back to W8A16
+- **Problem**: Different precision → mismatched results → error accumulation
 
-**Mitigation (NCCL Tuning)**:
+**The Fix: Force Consistent FP8 Behavior**
+```bash
+export VLLM_TEST_FORCE_FP8_MARLIN=1  # Critical: Force 4090 to use W8A16 (match 3090)
+```
+
+**Why this works**:
+- Without this flag: 4090 uses native W8A8, 3090 uses W8A16 → precision drift
+- With this flag: Both GPUs use Marlin W8A16 → consistent results
+
+**Additional NCCL Tuning** (provides stability margin):
 ```bash
 export NCCL_P2P_DISABLE=1    # Disable P2P communication
 export NCCL_IB_DISABLE=1     # Force PCIe
 export NCCL_ALGO=Ring        # Stable algorithm
 ```
 
-**Important**: With the correct Jinja template, TP mode works reliably even on mixed GPUs. NCCL tuning provides additional stability margin.
+**Important**: `VLLM_TEST_FORCE_FP8_MARLIN=1` is critical for mixed GPU setups. NCCL tuning provides additional stability margin.
 
 ---
 
@@ -194,9 +203,9 @@ export NCCL_P2P_DISABLE=1
 export NCCL_IB_DISABLE=1
 export NCCL_ALGO=Ring
 
-# FP8 configuration
+# FP8 configuration (CRITICAL for mixed GPU)
 export VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS=1
-export VLLM_TEST_FORCE_FP8_MARLIN=1
+export VLLM_TEST_FORCE_FP8_MARLIN=1  # Force 4090 to use W8A16 (match 3090, avoid precision drift)
 ```
 
 ### vLLM Serve Command
