@@ -45,6 +45,7 @@ source /home/cychan/vLLM/.venv/bin/activate
 # Enable memory profiler to estimate CUDA graphs v0.19 functionality
 export VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS=1
 export VLLM_TEST_FORCE_FP8_MARLIN=1
+export VLLM_SLEEP_WHEN_IDLE=1
 # Start vLLM with reduced swap space
 vllm serve $MODEL_NAME \
   --served-model-name Qwen3.5-27B \
