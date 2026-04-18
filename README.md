@@ -25,6 +25,25 @@ See [qwen_own_project README](https://github.com/allanchan339/qwen_own_project/b
 
 ---
 
+## Installation
+
+1. **Install dependencies**:
+   ```bash
+   uv sync
+   ```
+
+2. **Configure for your hardware**:
+   - Edit the appropriate `start_vllm_{name}.sh` script for your setup
+   - Adjust GPU memory utilization, tensor parallelism, and context length as needed
+   - Available scripts:
+     - `start_vllm_FP8.sh` - Best accuracy (48GB VRAM)
+     - `start_vllm_autoround.sh` - Lower VRAM usage (~44GB)
+
+3. **Start the server**:
+   ```bash
+   bash start_vllm_{name}.sh
+   ```
+
 ## Hardware & Environment
 
 ### Mixed GPU Setup
