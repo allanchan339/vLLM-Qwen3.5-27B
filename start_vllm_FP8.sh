@@ -67,7 +67,6 @@ vllm serve $MODEL_NAME \
   --host 0.0.0.0 \
   --port 8000 \
   --language-model-only 
-
 #  --speculative-config '{"method":"qwen3_next_mtp","num_speculative_tokens":5}' \
 # current hardware setting is not allowed to have 80BA3B model as speculator
 

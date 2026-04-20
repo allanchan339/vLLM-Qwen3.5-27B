@@ -53,7 +53,7 @@ This is the one that lasted the longest. The model want to build a oss-inspect p
 | "Fix it then" | 110.0K |
 | **Model died** - improper tool calling | 111.1K |
 
-This config survived to ~130K+ tokens before dying from improper tool calling. The DCP sweep at 135K dropped it to 107K, but it kept going. For context, the 3.5 27B model with the same setup routinely goes 130K+ without any interruption.
+This config survived to ~130K+ tokens (with 13m 20s) before dying from improper tool calling. The DCP sweep at 135K dropped it to 107K, but it kept going. For context, the 3.5 27B model with the same setup routinely goes 130K+ without any interruption.
 
 ### Run 2: `official.jinja` + `qwen3_coder`
 This model want to build a knowledge graph platform for graphify. (the skill ingestion is a bit aggressive ah?)
