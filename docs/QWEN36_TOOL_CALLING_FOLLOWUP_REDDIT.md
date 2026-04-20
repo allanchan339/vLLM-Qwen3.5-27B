@@ -25,7 +25,7 @@ Registry-based parser handles complex tool arguments without corruption. Officia
 
 ### `qwen3.5-enhanced.jinja` template
 
-The interleaved thinking template works on 3.6. Proper `</thinking>` tag handling, clean tool call formatting. 
+The interleaved thinking template works on 3.6 35B-A3B. Proper `</thinking>` tag handling, clean tool call formatting. 
 
 ### Precision drift on mixed GPUs
 
@@ -43,7 +43,7 @@ I gave each trail the same prompt: full ownership of the folder, build a full-st
 
 ### Run 1: `enhanced.jinja` + `qwen3_xml` **(my config)**
 
-This is the one that lasted the longest.
+This is the one that lasted the longest. The model want to build a oss-inspect project for automauous codebase quality analysis.
 
 | Prompt | Accumulated Tokens |
 |--------|-------------------|
@@ -53,15 +53,20 @@ This is the one that lasted the longest.
 | "Fix it then" | 110.0K |
 | **Model died** - improper tool calling | 111.1K |
 
-This config survived to ~111K tokens before dying from improper tool calling. The DCP sweep at 135K dropped it to 107K, but it kept going. For context, the 3.5 model with the same setup routinely goes 130K+ without any interruption.
+This config survived to ~130K+ tokens before dying from improper tool calling. The DCP sweep at 135K dropped it to 107K, but it kept going. For context, the 3.5 27B model with the same setup routinely goes 130K+ without any interruption.
 
 ### Run 2: `official.jinja` + `qwen3_coder`
+This model want to build a knowledge graph platform for graphify. (the skill ingestion is a bit aggressive ah?)
 
 **Died in 6m 32s** — improper tool calling.
 
 ### Run 3: `official.jinja` + `qwen3_xml`
+This time the model want to build TaskFlow — a Kanban project management app with authentication, drag-and-drop task management, and a polished UI
 
-**Died in <1m 16s** — malformed tool calls inside the thinking box.
+**Died in 1m 16s** — malformed tool calls inside the thinking box.
+
+#### Remarks 
+For the tech stack the model is using, I have 0 knowledge about it.
 
 ### Comparison Summary
 
@@ -71,7 +76,7 @@ This config survived to ~111K tokens before dying from improper tool calling. Th
 | `official.jinja` + `qwen3_coder` | 6m 32s | Improper tool calling |
 | `official.jinja` + `qwen3_xml` | ~1m 16s | Malformed tool calls in thinking box |
 
-For comparison, the same test on Qwen3.5-27B with `enhanced.jinja` + `qwen3_xml` reliably runs 130K+ tokens without interruption. 3.6 has a noticeably higher failure rate even with the best config.
+For comparison, the same test on Qwen3.5-27B with `enhanced.jinja` + `qwen3_xml` reliably runs 130K+ tokens before dying. 3.6 35B-A3B has a noticeably higher failure rate even with the best config. Qwen3.5-27B is still the most stable model for agentic work, despite its much slower TTFT.
 
 ---
 
@@ -79,27 +84,21 @@ For comparison, the same test on Qwen3.5-27B with `enhanced.jinja` + `qwen3_xml`
 
 ### 1. More Loopy
 
-The model gets stuck in reasoning loops more often. It'll loop through the same analysis step multiple times, consuming tokens, before eventually moving forward. This isn't a template issue — it's a model behavior change. On 3.5 this happened occasionally. On 3.6 it's frequent enough to meaningfully impact long sessions.
+The model gets stuck in reasoning loops more often. It'll loop through the same analysis step multiple times, consuming tokens, before eventually moving forward. This isn't a template issue — it's a model behavior change. On 3.5 27B this happened occasionally. On 3.6 35B-A3B it's frequent enough to meaningfully impact long sessions.
 
 ### 2. Malformed Tool Calls Interrupt Agentic Flow
 
-Even with `enhanced.jinja` + `qwen3_xml` (the config that works perfectly on 3.5), 3.6 has a higher chance of generating malformed tool calls that break the agentic process. The tool calling format still uses XML and is technically correct — but the frequency is higher and the damage is worse: an interrupted session that can't recover.
+Even with `enhanced.jinja` + `qwen3_xml` (the config that works perfectly on 3.5 27B), 3.6 35B-A3B has a higher chance of generating malformed tool calls that break the agentic process. The tool calling format still uses XML and is technically correct — but the frequency is higher and the damage is worse: an interrupted session that can't recover.
 
-On 3.5, a malformed tool call is a rare edge case. On 3.6, it's a regular occurrence that will eventually kill a long-running agentic session, no matter which config you use.
-
-### 3. Context Sweep Interaction
-
-When the DCP sweep triggered at 135K tokens (dropping session to 107K), the model recovered and kept going. But the context manipulation seems to interact poorly with the looping behavior — once swamped, it takes longer to regain coherence. This wasn't an issue with 3.5.
+On 3.5 27B, a malformed tool call is a rare edge case after patching the template. On 3.6 35B-A3B, it's a much more regular occurrence that will eventually kill a long-running agentic session, no matter which config you use.
 
 ---
 
 ## The Fix (Partial)
 
-**OpenCode 1.4.18** helps. The older version had tool calling issues that made things worse. Upgrading to 1.4.18 resolved some of the malformed tool call problems.
+**OpenCode 1.4.18** helps. The older version had tool calling issues that made things worse, this is especially true for the "question" tool. Upgrading to 1.4.18 resolved this issue of the malformed tool call problems.
 
-But here's the honest part: **upgrading the client doesn't solve the looping or the inherently higher failure rate on 3.6**. The issues above are in the model, not the tooling.
-
-One config tweak helped: **context length from 219,520 down to 200,000**. The 3.6 model is larger, so at 219k context it starts forcing offloading, which kills token throughput. At 200K, everything stays in GPU RAM and speed is maintained.
+But here's the honest part: **upgrading the client doesn't solve the looping or the inherently higher failure rate on 3.6**. The root cause is still in the model.
 
 ---
 
@@ -146,6 +145,8 @@ vllm serve Qwen/Qwen3.6-35B-A3B-FP8 \
 
 ## Bottom Line
 
-**My config (enhanced.jinja + qwen3_xml + OpenCode 1.4.18) is still the best you can do on Qwen3.6.** But it's worth being honest: Qwen3.6-35B-A3B is more loopy and has a higher failure rate for agentic tool calling compared to Qwen3.5-27B. The fixes carry over from 3.5, but the model itself is less reliable for long agentic work.
+**My config (enhanced.jinja + qwen3_xml + OpenCode 1.4.18) is still the best I can do on Qwen3.6 35B-A3B.** But it's worth being honest: Qwen3.6-35B-A3B is more loopy and has a higher failure rate for agentic tool calling compared to Qwen3.5-27B. It is quite surprising that the tool calling issues presents again on 3.6 35B-A3B. The root cause is still unknown (maybe preserved thinking is one of the reasons?)
 
-**I've decided to stick with Qwen3.5-27B-FP8.** For agentic obedience — following instructions, executing tool calls cleanly, not looping — the 27B model outperforms the 3.6 35B-A3B. 3.6 has better reasoning, but it pays for it with looping and tool call failures that kill long sessions. Reliability over raw intelligence for agentic work.
+Comparing Qwen3.5-27B, Qwen3.5-35B-A3B and Qwen3.6-35B-A3B, all three models official template are the same. It may reveal that Qwen team has his special treatment for the tool calling issues, if they decided to launch Qwen3.6 flash model. 
+
+**I've decided to stick with Qwen3.5-27B-FP8.** For agentic obedience — following instructions, executing tool calls cleanly, not looping — the 27B model outperforms the 3.6 35B-A3B in this regard (in my testing). 3.6 has much faster TTFT, similar ability to Qwen3.5-27B (by AA benchmark), but it pays for it with looping and tool call failures that kill long sessions. Reliability over raw intelligence for agentic work.
