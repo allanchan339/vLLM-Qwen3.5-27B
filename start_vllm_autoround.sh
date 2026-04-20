@@ -9,12 +9,6 @@
 #
 # Use this if: You need to save VRAM and accept accuracy tradeoffs
 # For best quality: ./start_vllm_FP8.sh (official Qwen3.5-27B-FP8)
-# --------------------------
-# CUDA PATH SETTINGS
-# --------------------------
-export CUDA_HOME=/usr
-export PATH=$CUDA_HOME/bin:$PATH
-export LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
 
 # Environment Variables
 export CUDA_DEVICE_ORDER=PCI_BUS_ID

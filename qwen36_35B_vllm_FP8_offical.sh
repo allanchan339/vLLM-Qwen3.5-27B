@@ -11,13 +11,6 @@
 #
 # Requires: qwen3.5-enhanced.jinja template in working directory 
 
-# --------------------------
-# CUDA PATH SETTINGS
-# --------------------------
-# Since nvcc is in /usr/bin, we set CUDA_HOME to /usr
-export CUDA_HOME=/usr
-export PATH=$CUDA_HOME/bin:$PATH
-export LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
 # ------------------------------
 # Safe, Speed-Focused Env Vars
 # ------------------------------
@@ -52,7 +45,7 @@ vllm serve $MODEL_NAME \
   --attention-backend FLASHINFER \
   --trust-remote-code \
   --tensor-parallel-size 2 \
-  --max-model-len 200000 \
+  --max-model-len 219520 \
   --gpu-memory-utilization 0.91 \
   --enable-auto-tool-choice \
   --enable-chunked-prefill \
