@@ -72,7 +72,7 @@ For the tech stack the model is using, I have 0 knowledge about it.
 
 | Config | Survival | Failure Mode |
 |--------|----------|-------------|
-| `enhanced.jinja` + `qwen3_xml` | ~111K tokens | Improper tool calling (died) |
+| `enhanced.jinja` + `qwen3_xml` | ~111K tokens (13m 20s) | Improper tool calling (died) |
 | `official.jinja` + `qwen3_coder` | 6m 32s | Improper tool calling |
 | `official.jinja` + `qwen3_xml` | ~1m 16s | Malformed tool calls in thinking box |
 
@@ -98,7 +98,7 @@ On 3.5 27B, a malformed tool call is a rare edge case after patching the templat
 
 **OpenCode 1.4.18** helps. The older version had tool calling issues that made things worse, this is especially true for the "question" tool. Upgrading to 1.4.18 resolved this issue of the malformed tool call problems.
 
-But here's the honest part: **upgrading the client doesn't solve the looping or the inherently higher failure rate on 3.6**. The root cause is still in the model.
+But here's the honest part: **upgrading the client doesn't solve the looping or the inherently higher failure rate on 3.6**. The root cause is still in the model (or template?).
 
 ---
 
