@@ -56,16 +56,16 @@ This is the one that lasted the longest. The model want to build a oss-inspect p
 This config survived to ~130K+ tokens (with 13m 20s) before dying from improper tool calling. The DCP sweep at 135K dropped it to 107K, but it kept going. For context, the 3.5 27B model with the same setup routinely goes 130K+ without any interruption.
 
 ### Run 2: `official.jinja` + `qwen3_coder`
-This model want to build a knowledge graph platform for graphify. (the skill ingestion is a bit aggressive ah?)
+This model wanted to build a knowledge graph platform for graphify. (the skill ingestion is a bit aggressive ah?)
 
-**Died in 6m 32s** — improper tool calling.
+**Died in 6m 32s** — improper tool calling. Failed too early to be reliable for agentic tasks.
 
 ### Run 3: `official.jinja` + `qwen3_xml`
-This time the model want to build TaskFlow — a Kanban project management app with authentication, drag-and-drop task management, and a polished UI
+This time the model wanted to build TaskFlow — a Kanban project management app with authentication, drag-and-drop task management, and a polished UI.
 
-**Died in 1m 16s** — malformed tool calls inside the thinking box.
+**Died in 1m 16s** — malformed tool calls inside the thinking box. Failed too early to be reliable for agentic tasks.
 
-#### Remarks 
+#### Remarks
 For the tech stack the model is using, I have 0 knowledge about it.
 
 ### Comparison Summary
@@ -103,6 +103,10 @@ But here's the honest part: **upgrading the client doesn't solve the looping or 
 ---
 
 ## My Config
+
+**vLLM Version**: 0.19.1
+**Transformers Version**: 5.5.4
+**CUDA Version**: 12.8.1 (nvcc 12.8.93)
 
 ```bash
 export CUDA_DEVICE_ORDER=PCI_BUS_ID
