@@ -138,21 +138,18 @@
     {%- elif message.role == "assistant" -%}
         {%- set content = render_content(message.content, true)|trim -%}
 
-        {# --- Self‑healing: handle unclosed, late‑closed, or non‑closed think before tool_call --- #}
+        {# --- 完美自癒：處理任意數量 <think> 未閉合的情況 --- #}
         {%- if '<tool_call>' in content and '<think>' in content -%}
-            {%- set tool_call_pos = content.find('<tool_call>') -%}
-            {%- set think_close_pos = content.find('</think>') -%}
-            {%- if think_close_pos == -1 -%}
-                {# No closing think at all: force‑close right before tool call #}
-                {%- set content = content[:tool_call_pos] + '</think>' -%}
-            {%- elif think_close_pos > tool_call_pos -%}
-                {# </think> appears AFTER the tool call: split properly #}
-                {%- set reasoning_part = content[:tool_call_pos] -%}
-                {%- set post_think_part = content[think_close_pos + '</think>'|length:] -%}
-                {# Combine reasoning + (closed think) + post‑think content, but omit the raw tool call block because tool_calls struct will be used later #}
-                {%- set content = reasoning_part + '</think>' + post_think_part -%}
+            {%- set last_think = content.rfind('<think>') -%}
+            {%- set last_close = content.rfind('</think>') -%}
+            {%- set tool_pos = content.find('<tool_call>') -%}
+            {%- if last_close < last_think or last_close == -1 -%}
+                {%- if tool_pos > last_think -%}
+                    {%- set content = content[:tool_pos] + '</think>' + content[tool_pos:] -%}
+                {%- else -%}
+                    {%- set content = content + '</think>' -%}
+                {%- endif -%}
             {%- endif -%}
-            {# If </think> is before tool_call, the original logic would have already split it correctly – no repair needed. #}
         {%- endif -%}
 
         {%- set reasoning_content = '' -%}
@@ -165,11 +162,14 @@
             {%- endif -%}
         {%- endif -%}
         {%- set reasoning_content = reasoning_content|trim -%}
+
+        {# --- 總是輸出閉合的 think 塊，即使 reasoning 為空，確保 tool_call 永遠在外面 --- #}
         {%- if (preserve_thinking is defined and preserve_thinking is true) or (loop.index0 > ns.last_user_index) %}
             {{- '<|im_start|>assistant\n<think>\n' ~ reasoning_content ~ '\n</think>\n\n' ~ content -}}
         {%- else -%}
             {{- '<|im_start|>assistant\n' ~ content -}}
         {%- endif -%}
+
         {%- if message.tool_calls and message.tool_calls is iterable and message.tool_calls is not mapping -%}
             {%- for tool_call in message.tool_calls -%}
                 {%- if tool_call.function is defined -%}
