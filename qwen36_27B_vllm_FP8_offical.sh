@@ -20,6 +20,7 @@ export MODEL_NAME="Qwen/Qwen3.6-27B-FP8"
 export NCCL_P2P_LEVEL=LOC
 export VLLM_RPC_TIMEOUT=180
 export VLLM_WORKER_MULTIPROC_METHOD=spawn
+
 # --------------------------
 # FIX: Clean Stale FlashInfer Cache
 # --------------------------
@@ -35,8 +36,7 @@ export VLLM_SLEEP_WHEN_IDLE=1
 # Start vLLM with reduced swap space
 vllm serve $MODEL_NAME \
   --served-model-name Qwen3.5-27B \
-  --chat-template qwen3.5-enhanced.jinja \
-  --default-chat-template-kwargs '{"preserve_thinking": false}' \
+  --default-chat-template-kwargs '{"preserve_thinking": true}' \
   --attention-backend FLASHINFER \
   --trust-remote-code \
   --tensor-parallel-size 2 \
@@ -48,13 +48,12 @@ vllm serve $MODEL_NAME \
   --max-num-batched-tokens 12288 \
   --max-num-seqs 4 \
   --kv-cache-dtype fp8 \
-  --tool-call-parser qwen3_xml \
+  --tool-call-parser qwen3_coder \
   --reasoning-parser qwen3 \
   --no-use-tqdm-on-load \
   --host 0.0.0.0 \
   --port 8000 \
-  --language-model-only \
-  --disable-custom-all-reduce 
+  --language-model-only 
 
 #  --speculative-config '{"method":"qwen3_next_mtp","num_speculative_tokens":5}' \
 # current hardware setting is not allowed to have 80BA3B model as speculator
