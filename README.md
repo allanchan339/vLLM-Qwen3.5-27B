@@ -2,6 +2,9 @@
 
 If this repo helped you run Qwen3.5-27B successfully on mixed GPU setups, please consider giving it a ⭐ star on GitHub!
 
+## chat-template 
+chat-template is located in `chat-template` folder, where Qwen3.5 and Qwen3.6 has different templates.
+
 **📖 Read the full story**: [Reddit Deep Dive - Qwen 3.5 Tool Calling Issues: Why It Breaks & How I Fixed It](https://www.reddit.com/r/Vllm/comments/1skks8n/qwen_35_27b35ba3b_tool_calling_issues_why_it/)
 
 ## Success Story: Knowledge Platform
